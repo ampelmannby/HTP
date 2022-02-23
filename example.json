@@ -1,0 +1,21 @@
+{
+  "FirstName": "Kirill",
+  "LastName": "Zalessky",
+  "Age": 41,
+  "Smoking": null,
+  "Address": {
+    "City": "Minsk",
+    "Street": "Bogdanovicha",
+    "Building": 86,
+    "APT": 235
+  }
+}
+
+{
+  "Name": "Misha",
+  "Age": "12",
+  "Interests": {
+      "Food": "KFC",
+      "Drink": "Tea"
+  }
+}

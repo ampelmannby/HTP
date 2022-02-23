@@ -3,10 +3,10 @@ import csv
 
 
 class ExportDatabase:
-
     def __init__(self):
         self.products_worldwide_array = list()
-        self.products_of_country_dict = dict()
+        self.exports_of_country_dict = dict()
+        self.imports_of_country_dict = dict()
         self.countries_array = list()
         self.countries_dict = dict()
         self.countries_id_list = list()
@@ -25,15 +25,26 @@ class ExportDatabase:
                 self.products_worldwide_array.append([int(iso_datetime_to_unix(row[6])), str(row[6]), str(row[1]),
                                                       str(row[2]), str(row[3]), str(row[4]), int(row[5])])
             self.products_worldwide_array.sort()
+
         for country_id in self.countries_id_list:
-            temp_array = []
+            temp_exports_array = []
+            temp_imports_array = []
             for i in range(len(self.products_worldwide_array)):
                 if self.products_worldwide_array[i][2] == '1' and int(self.products_worldwide_array[i][5]) == country_id:
-                    temp_array.append(self.products_worldwide_array[i])
-            self.products_of_country_dict[country_id] = temp_array
+                    temp_exports_array.append(self.products_worldwide_array[i])
+                if self.products_worldwide_array[i][2] == '2' and int(self.products_worldwide_array[i][5]) == country_id:
+                    temp_imports_array.append(self.products_worldwide_array[i])
+            self.exports_of_country_dict[country_id] = temp_exports_array
+            self.imports_of_country_dict[country_id] = temp_imports_array
 
 
 def date_by_components(date_from_products_file):
+    '''
+    Принимает дату и время в формате, который записывает в таблицу MS Access (1.1.2021 00:00:00),
+    выделяет из нее отдельно год, месяц, день.
+    :param date_from_products_file: Дата и время в формате '1.1.2021 00:00:00'.
+    :return: day=1, month=1, year=2021
+    '''
     only_date = date_from_products_file.split(' ')[0]
     day, month, year = only_date.split('.')[0], only_date.split('.')[1], only_date.split('.')[2],
     return day, month, year
@@ -50,13 +61,22 @@ def iso_datetime_to_unix(iso_datetime):
 
 
 def iso_date_to_unix(date: str):
-    input_datetime = date+' 00:00:00'
-    unix_time = iso_datetime_to_unix(input_datetime)
+    '''
+    Принимает дату в формате '2021-01-01', возвращает UNIX-время на момент времени 00:00:00 этой даты
+    :param date: Дата в формате '2021-01-01'
+    :return: Время в формате UNIX (int)
+
+    '''
+    iso_datetime = date+' 00:00:00'
+    unix_time = int(time.mktime(time.strptime(iso_datetime, '%d.%m.%Y %H:%M:%S')))
     return unix_time
 
 
 def read_file_products_from_access():
-
+    """
+    Переводит файл "products.txt" из текущей папки в массив строк.
+    :return: Массив строк (дата, код экспорт/импорт,УНН, код услуги, код страны, сумма)
+    """
     products_array = []
     with open("products.txt", newline='') as source_file:
         reader = csv.reader(source_file, delimiter=";")
@@ -74,6 +94,12 @@ def read_file_products_from_access():
 
 
 def separate_product_array_for_countries(products_array, country_id: int):
+    """
+    Выделяет массив строк, относящихся к одной конкретной стране
+    :param products_array: Общий массив
+    :param country_id: Код страны (ISO)
+    :return: Массив со строками по одной заданой стране
+    """
     products_to_country_array = list()
     for i in range(len(products_array)):
         if products_array[i][2] == '1' and products_array[i][4] == country_id:
@@ -81,17 +107,23 @@ def separate_product_array_for_countries(products_array, country_id: int):
     return products_to_country_array
 
 
+def make_month_dict():
+    '''
+    Создает словарь со обозначениями месяцев в разных падежах
+    :return: Словарь с месяцами (dict)
+    '''
+    month_dict = {"1": ["январь", "января"], "2": ["февраль", "февраля"], "3": ["март", "марта"],
+                  "4": ["апрель", "апреля"],
+                  "5": ["май", "мая"], "6": ["июнь", "июня"], "7": ["июль", "июля"], "8": ["август", "августа"],
+                  "9": ["сентябрь", "сентября"], "10": ["октябрь", "октября"], "11": ["ноябрь", "ноября"],
+                  "12": ["декабрь", "декабря"]}
+    return month_dict
+
+
 def main():
     print('\nПодгружаем необходимые данные...')
     database = ExportDatabase()
-    month_dict = {"1": ["январь", "января"], "2": ["февраль", "февраля"], "3": ["март", "марта"],
-                      "4": ["апрель", "апреля"],
-                      "5": ["май", "мая"], "6": ["июнь", "июня"], "7": ["июль", "июля"], "8": ["август", "августа"],
-                      "9": ["сентябрь", "сентября"], "10": ["октябрь", "октября"], "11": ["ноябрь", "ноября"],
-                      "12": ["декабрь", "декабря"]}
-
-
-
+    month_dict = make_month_dict()
     while True:
         print('\nИтоги экспорта в какую страну Вас интересуют?'
               '\nВведите страну по-русски или нажмите "Enter" для получения общих данных за весь мир.')
@@ -103,21 +135,24 @@ def main():
                 country_id = int(database.countries_dict[country_input])
                 print(f'\nИщем статистику по стране: {country_input} (код ISO {country_id}).')
                 message = f'Данные по экспорту в страну: {country_input} (код ISO {country_id}).'
-                products_array = database.products_of_country_dict[country_id]
+                exports_array = database.exports_of_country_dict[country_id]
                 percent_insert = True
             elif country_input == '':
-                products_array = database.products_worldwide_array
+                exports_array = database.products_worldwide_array
                 print('Ищем статистику за весь мир.')
                 message = f'Общие данные экспорту во все страны мира.'
                 percent_insert = False
-            first_line_unix = products_array[0][0]
-            last_line_unix = products_array[-1][0]
-            first_day, first_month, first_year = date_by_components(products_array[0][1])
-            last_date, last_month, last_year = date_by_components(products_array[-1][1])
+
+            first_line_unix = exports_array[0][0]
+            last_line_unix = exports_array[-1][0]
+            first_day, first_month, first_year = date_by_components(exports_array[0][1])
+            last_date, last_month, last_year = date_by_components(exports_array[-1][1])
+
             print(f"\nВ базе данных {len(database.products_worldwide_array)} строк c {month_dict[first_month][1]} "
                   f"{first_year} года по {month_dict[last_month][0]} {last_year} года включительно."
                   f"\nДанные этой базы отличаются от эталонных на 2-3%."
                   f"\nЭталонные данные (поквартальные) доступны в отделе мониторинга.")
+
             last_year_for_search = int(input('\nЗа какой год ищем статистику? (2008 - 2021): '))
             last_month_for_search = int(input('За сколько месяцев ищем статистику? (1 - 12): '))
             start_current_year = '1.1.' + str(last_year_for_search) + ' 00:00:00'
@@ -145,13 +180,13 @@ def main():
                           f'отсутствует в базе данных. Уточните и начните заново.')
                 elif first_line_unix <= current_period_end_unix <= last_line_unix:
 
-                    for i in range(len(products_array)):
-                        if products_array[i][2] == '1' and current_period_start_unix <= products_array[i][0] <= \
+                    for i in range(len(exports_array)):
+                        if exports_array[i][2] == '1' and current_period_start_unix <= exports_array[i][0] <= \
                                 current_period_end_unix:
-                            export_current += products_array[i][6]
-                        if products_array[i][2] == '1' and previous_period_start_unix <= products_array[i][0] <= \
+                            export_current += exports_array[i][6]
+                        if exports_array[i][2] == '1' and previous_period_start_unix <= exports_array[i][0] <= \
                                 previous_period_end_unix:
-                            export_previous += products_array[i][6]
+                            export_previous += exports_array[i][6]
 
                     for i in range(len(database.products_worldwide_array)):
                         if database.products_worldwide_array[i][2] == '1' and current_period_start_unix <= database.products_worldwide_array[i][0] <= \
